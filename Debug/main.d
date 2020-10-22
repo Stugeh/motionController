@@ -243,7 +243,6 @@ main.obj: D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/cc26xxware_2_24_02_1720
 main.obj: D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/cc26xxware_2_24_02_17202/driverlib/rf_mailbox.h
 main.obj: D:/ti/ccsv6/tools/compiler/ti-cgt-arm_15.12.1.LTS/include/string.h
 main.obj: D:/Koulu/JTKJ-LLO/ccs_wrkspc/motionController/wireless/address.h
-main.obj: ../sensors/opt3001.h
 main.obj: ../sensors/mpu9250.h
 
 ../main.c: 
@@ -489,5 +488,4 @@ D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/cc26xxware_2_24_02_17202/driverli
 D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/cc26xxware_2_24_02_17202/driverlib/rf_mailbox.h: 
 D:/ti/ccsv6/tools/compiler/ti-cgt-arm_15.12.1.LTS/include/string.h: 
 D:/Koulu/JTKJ-LLO/ccs_wrkspc/motionController/wireless/address.h: 
-../sensors/opt3001.h: 
 ../sensors/mpu9250.h: 

@@ -511,6 +511,15 @@ void mpu9250_get_data(I2C_Handle *i2c, float *ax, float *ay, float *az, float *g
 	//          values (data[7]), by bit operations. Here the value for data[0] comes
 	//          from ACCEL_XOUT_H (=MSB) ja ACCEL_XOUT_L (=LSB)
 
+	//uint16_t rawData = ((uint16_t)rxBuffer[0] << 8 | rxBuffer[1]);
+	int16_t newVal = 0;
+	int j = 0;
+	int i;
+	for (i = 0; i<14; i=i+2){
+		newVal = ((int16_t)rawData[i]<< 8  | rawData[i+1]);
+		data[j] = newVal;
+		j++;
+	}
 	// JTKJ: 3. Muunnetaan 16-bittiset rekisterinarvot g-arvoiksi.
 	// JTKJ: 3. Convert 16-bit register values into g values
 	*ax = (float)data[0]*aRes - accelBias[0];
