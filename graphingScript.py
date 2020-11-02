@@ -14,14 +14,12 @@ index = count()
 
 def animate(i):
     try:
-        data = pd.read_csv('/Debug/data.csv')
-
-
+        data = pd.read_csv('Debug/data.csv')
 
         x = data['time']
-        ax = data['ax']
-        ay = data['ay']
-        az = data['az']
+        ax = data['ax']*300
+        ay = data['ay']*300
+        az = data['az']*300
         gx = data['gx']
         gy = data['gy']
         gz = data['gz']

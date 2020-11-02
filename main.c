@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 
 /* XDCtools files */
@@ -51,11 +52,10 @@ struct motionData{
 Void sensorFxn(UArg arg0, UArg arg1) {
 	float ax, ay, az, gx, gy, gz;
 
-	System_printf("Initializing csv\n");
-	System_flush();
+//	System_printf("Initializing csv\n");
+//	System_flush();
 	fptr = fopen("data.csv", "w");
-	fprintf(fptr, "SEP=,\ntime,ax,ay,az,gx,gy,gz\n");
-	fclose(fptr);
+	fprintf(fptr, "time,ax,ay,az,gx,gy,gz\n");
 	/*
   	I2C_Handle i2c; // INTERFACE FOR OTHER SENSORS
 	I2C_Params i2cParams;
@@ -94,7 +94,7 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 	int i = 0;
 	UInt32 timestamp;
 	char buffer[80];
-	//motionData MPUData[10000];
+	struct motionData MPUData[20];
 	while (1) {
 		struct motionData dataPoint;
 		//Collect data from motion sensor
@@ -103,10 +103,10 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 			System_abort("Error Initializing I2CMPU\n");
 		}
 		mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
-		timestamp = Clock_getTicks() / Clock_tickPeriod;
+		timestamp = Clock_getTicks();
 		I2C_close(i2cMPU);
 
-		sprintf(buffer,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
+		//sprintf(buffer,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
 
 		//write data to a datapoint and add to array
 		dataPoint.ax = ax;
@@ -121,35 +121,47 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 		//write datapoint to a csv for monitoring via python script
 		System_printf("Writing to file\n");
 		System_flush();
-		if((fptr = fopen ("data.csv", "a")) != NULL){
-			//fputs(buffer, fptr);
-			fclose(fptr);
-		}
+		fprintf(fptr,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
 
+/*
+  		if(i==20){
+			System_printf("Writing to file\n");
+			System_flush();
+
+			fptr = fopen("data.csv", "w");
+			fprintf(fptr, "time,ax,ay,az,gx,gy,gz\n");
+			int j;
+			for(j=0;j<i;j++){
+				fprintf(fptr, "%d,%f,%f,%f,%f,%f,%f\n",MPUData[j].time, MPUData[j].ax, MPUData[j].ay, MPUData[j].az, MPUData[j].gx, MPUData[j].gy, MPUData[j].gz);
+			}
+			fclose(fptr);
+			i=0;
+		}
+*/
+
+
+//			fptr = fopen ("data.csv", "a");
+//			fwrite(buffer , 1 , sizeof(buffer) , fptr);
+//			fclose(fptr);
 
 		i++;
-		Task_sleep(1000);
+		Task_sleep(10000/Clock_tickPeriod);
 	}
 }
 
 /* Communication Task */
 /*
  Void commTaskFxn(UArg arg0, UArg arg1) {
-
  // Radio to receive mode
  int32_t result = StartReceive6LoWPAN();
  if(result != true) {
  System_abort("Wireless receive mode failed");
  }
-
  while (1) {
-
  // If true, we have a message
  if (GetRXFlag() == true) {
-
  // Handle the received message..
  }
-
  // Absolutely NO Task_sleep in this task!!
  }
  }
@@ -179,12 +191,10 @@ Int main(void) {
 	/* Communication Task */
 	/*
 	 Init6LoWPAN(); // This function call before use!
-
 	 Task_Params_init(&commTaskParams);
 	 commTaskParams.stackSize = STACKSIZE;
 	 commTaskParams.stack = &commTaskStack;
 	 commTaskParams.priority=1;
-
 	 commTask = Task_create(commTaskFxn, &commTaskParams, NULL);
 	 if (commTask == NULL) {
 	 System_abort("Task create failed!");
