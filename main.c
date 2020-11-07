@@ -48,20 +48,40 @@ struct motionData{
 	UInt32 time;
 };
 
+//Stores last 3 seconds of motion data from MPU9250.
+struct motionData MPUData[30] = {NULL};
+
+//calculates moving average to clean up data
+void movavg(int i){
+	//how many datapoints to get the average from
+	int window=3;
+	float axTot, ayTot, azTot, gxTot, gyTot, gzTot;
+	int j;
+	for(j=i; j > i - window; j--){
+		axTot = axTot + MPUData[j].ax;
+		ayTot = ayTot + MPUData[j].ay;
+		azTot = azTot + MPUData[j].az;
+		gxTot = gxTot + MPUData[j].gx;
+		gyTot = gyTot + MPUData[j].gy;
+		gzTot = gzTot + MPUData[j].gz;
+	}
+	MPUData[i].ax = axTot / window;
+	MPUData[i].ay = ayTot / window;
+	MPUData[i].az = azTot / window;
+	MPUData[i].gx = gxTot / window;
+	MPUData[i].gy = gyTot / window;
+	MPUData[i].gz = gzTot / window;
+
+}
+
 /*Data collection task*/
 Void sensorFxn(UArg arg0, UArg arg1) {
 	float ax, ay, az, gx, gy, gz;
 
-//	System_printf("Initializing csv\n");
-//	System_flush();
+/*
+ 	//opening data file to monitor sensor via python script
 	fptr = fopen("data.csv", "w");
-	fprintf(fptr, "time,ax,ay,az,gx,gy,gz\n");
-	/*
-  	I2C_Handle i2c; // INTERFACE FOR OTHER SENSORS
-	I2C_Params i2cParams;
-	I2C_Params_init(&i2cParams);
-	i2cParams.bitRate = I2C_400kHz;
-	 */
+*/
 
 	I2C_Handle i2cMPU; // INTERFACE FOR MPU9250 SENSOR
 	I2C_Params i2cMPUParams;
@@ -93,8 +113,6 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 
 	int i = 0;
 	UInt32 timestamp;
-	char buffer[80];
-	struct motionData MPUData[20];
 	while (1) {
 		struct motionData dataPoint;
 		//Collect data from motion sensor
@@ -103,10 +121,8 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 			System_abort("Error Initializing I2CMPU\n");
 		}
 		mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
-		timestamp = Clock_getTicks();
+		timestamp = Clock_getTicks()/Clock_tickPeriod;
 		I2C_close(i2cMPU);
-
-		//sprintf(buffer,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
 
 		//write data to a datapoint and add to array
 		dataPoint.ax = ax;
@@ -116,36 +132,19 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 		dataPoint.gy = gy;
 		dataPoint.gz = gz;
 		dataPoint.time = timestamp;
-		//MPUData[i] = dataPoint;
+		MPUData[i] = dataPoint;
+
+		movavg(i);
 
 		//write datapoint to a csv for monitoring via python script
-		System_printf("Writing to file\n");
-		System_flush();
-		fprintf(fptr,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
+		//fprintf(fptr,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
 
-/*
-  		if(i==20){
-			System_printf("Writing to file\n");
-			System_flush();
-
-			fptr = fopen("data.csv", "w");
-			fprintf(fptr, "time,ax,ay,az,gx,gy,gz\n");
-			int j;
-			for(j=0;j<i;j++){
-				fprintf(fptr, "%d,%f,%f,%f,%f,%f,%f\n",MPUData[j].time, MPUData[j].ax, MPUData[j].ay, MPUData[j].az, MPUData[j].gx, MPUData[j].gy, MPUData[j].gz);
-			}
-			fclose(fptr);
-			i=0;
-		}
-*/
-
-
-//			fptr = fopen ("data.csv", "a");
-//			fwrite(buffer , 1 , sizeof(buffer) , fptr);
-//			fclose(fptr);
 
 		i++;
-		Task_sleep(10000/Clock_tickPeriod);
+		if(i==30){
+			i=0;
+		}
+		Task_sleep(100000/Clock_tickPeriod);
 	}
 }
 
