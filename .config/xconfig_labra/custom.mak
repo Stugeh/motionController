@@ -7,5 +7,5 @@
 #       or equal to the generated config header
 #
 linker.cmd: package/cfg/labra_pem3.xdl
-	$(SED) 's"^\"\(package/cfg/labra_pem3cfg.cmd\)\"$""\"D:/Koulu/JTKJ-LLO/labtemplate/.config/xconfig_labra/\1\""' package/cfg/labra_pem3.xdl > $@
+	$(SED) 's"^\"\(package/cfg/labra_pem3cfg.cmd\)\"$""\"D:/Koulu/JTKJ-LLO/ccs_wrkspc/motionController/.config/xconfig_labra/\1\""' package/cfg/labra_pem3.xdl > $@
 	-$(SETDATE) -r:max package/cfg/labra_pem3.h compiler.opt compiler.opt.defs

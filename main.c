@@ -48,36 +48,38 @@ struct motionData{
 	UInt32 time;
 };
 
-//Stores last 3 seconds of motion data from MPU9250.
-struct motionData MPUData[30] = {NULL};
+//Stores last 5 seconds of motion data from MPU9250.
+struct motionData MPUData[40] = {NULL};
+struct motionData xData[100] = {NULL};
 
+
+int forPrinting = 0;
 //calculates moving average to clean up data
 void movavg(int i){
 	//how many datapoints to get the average from
-	int window=3;
-	float axTot, ayTot, azTot, gxTot, gyTot, gzTot;
-	int j;
-	for(j=i; j > i - window; j--){
-		axTot = axTot + MPUData[j].ax;
-		ayTot = ayTot + MPUData[j].ay;
-		azTot = azTot + MPUData[j].az;
-		gxTot = gxTot + MPUData[j].gx;
-		gyTot = gyTot + MPUData[j].gy;
-		gzTot = gzTot + MPUData[j].gz;
-	}
-	MPUData[i].ax = axTot / window;
-	MPUData[i].ay = ayTot / window;
-	MPUData[i].az = azTot / window;
-	MPUData[i].gx = gxTot / window;
-	MPUData[i].gy = gyTot / window;
-	MPUData[i].gz = gzTot / window;
+	int window=9;
+		float axTot = 0, ayTot = 0, azTot = 0, gxTot = 0, gyTot = 0, gzTot = 0;
+		int j;
+		for(j=i; j > i - window; j--){
+			axTot = axTot + MPUData[j].ax;
+			ayTot = ayTot + MPUData[j].ay;
+			azTot = azTot + MPUData[j].az;
+			gxTot = gxTot + MPUData[j].gx;
+			gyTot = gyTot + MPUData[j].gy;
+			gzTot = gzTot + MPUData[j].gz;
+		}
+		MPUData[i].ax = axTot / window;
+		MPUData[i].ay = ayTot / window;
+		MPUData[i].az = azTot / window;
+		MPUData[i].gx = gxTot / window;
+		MPUData[i].gy = gyTot / window;
+		MPUData[i].gz = gzTot / window;
 
+		xData[forPrinting] = MPUData[i];
 }
-
 /*Data collection task*/
 Void sensorFxn(UArg arg0, UArg arg1) {
 	float ax, ay, az, gx, gy, gz;
-
 /*
  	//opening data file to monitor sensor via python script
 	fptr = fopen("data.csv", "w");
@@ -107,9 +109,10 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 	System_printf("MPU9250: Setup and calibration...\n");
 	System_flush();
 	mpu9250_setup(&i2cMPU);
-	System_printf("MPU9250: Setup and calibration OK\n");
+	System_printf("MPU9250: Setup and calibration OK\nStarting data collection\n");
 	System_flush();
 	I2C_close(i2cMPU);
+
 
 	int i = 0;
 	UInt32 timestamp;
@@ -134,14 +137,25 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 		dataPoint.time = timestamp;
 		MPUData[i] = dataPoint;
 
-		movavg(i);
-
+		//movavg(i);
+		xData[forPrinting] = MPUData[i];
 		//write datapoint to a csv for monitoring via python script
 		//fprintf(fptr,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
 
 
 		i++;
-		if(i==30){
+		forPrinting++;
+		if(forPrinting==100){
+			System_printf("time,ax,ay,az,gx,gy,gz\n");
+			System_flush();
+			int n;
+			for(n=0;n<forPrinting; n++){
+				System_printf("%d,%f,%f,%f,%f,%f,%f\n",xData[n].time, xData[n].ax, xData[n].ay, xData[n].az,xData[n].gx, xData[n].gy, xData[n].gz);
+				System_flush();
+			}
+
+		}
+		if(i==40){
 			i=0;
 		}
 		Task_sleep(100000/Clock_tickPeriod);
@@ -165,7 +179,6 @@ Void sensorFxn(UArg arg0, UArg arg1) {
  }
  }
  */
-
 Int main(void) {
 
 	Task_Handle task;
