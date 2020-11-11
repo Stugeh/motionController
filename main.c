@@ -57,7 +57,7 @@ int forPrinting = 0;
 //calculates moving average to clean up data
 void movavg(int i){
 	//how many datapoints to get the average from
-	int window=9;
+	int window=3;
 		float axTot = 0, ayTot = 0, azTot = 0, gxTot = 0, gyTot = 0, gzTot = 0;
 		int j;
 		for(j=i; j > i - window; j--){
@@ -77,6 +77,32 @@ void movavg(int i){
 
 		xData[forPrinting] = MPUData[i];
 }
+
+void moveDetection(int i){
+	int gThreshold = 20;
+	int sleep = 300000;
+	if(MPUData[i].gx > gThreshold){
+		System_printf("L\n");
+		System_flush();
+		Task_sleep(sleep / Clock_tickPeriod);
+	}
+	if(MPUData[i].gx < -gThreshold){
+		System_printf("R\n");
+		System_flush();
+		Task_sleep(sleep / Clock_tickPeriod);
+	}
+	if(MPUData[i].gy > gThreshold){
+		System_printf("U\n");
+		System_flush();
+		Task_sleep(sleep / Clock_tickPeriod);
+	}
+	if(MPUData[i].gy < -gThreshold){
+		System_printf("D\n");
+		System_flush();
+		Task_sleep(sleep / Clock_tickPeriod);
+	}
+}
+
 /*Data collection task*/
 Void sensorFxn(UArg arg0, UArg arg1) {
 	float ax, ay, az, gx, gy, gz;
@@ -137,12 +163,9 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 		dataPoint.time = timestamp;
 		MPUData[i] = dataPoint;
 
-		//movavg(i);
-		xData[forPrinting] = MPUData[i];
-		//write datapoint to a csv for monitoring via python script
-		//fprintf(fptr,"%d,%f,%f,%f,%f,%f,%f\n",timestamp, ax, ay, az, gx, gy, gz);
-
-
+		movavg(i);
+		//xData[forPrinting] = MPUData[i];
+		moveDetection(i);
 		i++;
 		forPrinting++;
 		if(forPrinting==100){
