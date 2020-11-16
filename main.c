@@ -17,7 +17,7 @@
 #include <ti/drivers/power/PowerCC26XX.h>
 #include <ti/mw/display/Display.h>
 #include <ti/mw/display/DisplayExt.h>
-#include <ti/drivers/UART.h>
+//#include <ti/drivers/UART.h>
 
 /* Board Header files */
 #include "Board.h"
@@ -55,32 +55,32 @@ struct motionData xData[100] = {NULL};
 
 int forPrinting = 0;
 //calculates moving average to clean up data
-void movavg(int i){
+void movavg(uint8_t i){
 	//how many datapoints to get the average from
-	int window=3;
-		float axTot = 0, ayTot = 0, azTot = 0, gxTot = 0, gyTot = 0, gzTot = 0;
-		int j;
-		for(j=i; j > i - window; j--){
-			axTot = axTot + MPUData[j].ax;
-			ayTot = ayTot + MPUData[j].ay;
-			azTot = azTot + MPUData[j].az;
-			gxTot = gxTot + MPUData[j].gx;
-			gyTot = gyTot + MPUData[j].gy;
-			gzTot = gzTot + MPUData[j].gz;
-		}
-		MPUData[i].ax = axTot / window;
-		MPUData[i].ay = ayTot / window;
-		MPUData[i].az = azTot / window;
-		MPUData[i].gx = gxTot / window;
-		MPUData[i].gy = gyTot / window;
-		MPUData[i].gz = gzTot / window;
+	uint8_t window=3;
+	float axTot = 0, ayTot = 0, azTot = 0, gxTot = 0, gyTot = 0, gzTot = 0;
+	uint8_t j;
+	for(j=i; j > i - window; j--){
+		axTot = axTot + MPUData[j].ax;
+		ayTot = ayTot + MPUData[j].ay;
+		azTot = azTot + MPUData[j].az;
+		gxTot = gxTot + MPUData[j].gx;
+		gyTot = gyTot + MPUData[j].gy;
+		gzTot = gzTot + MPUData[j].gz;
+	}
+	MPUData[i].ax = axTot / window;
+	MPUData[i].ay = ayTot / window;
+	MPUData[i].az = azTot / window;
+	MPUData[i].gx = gxTot / window;
+	MPUData[i].gy = gyTot / window;
+	MPUData[i].gz = gzTot / window;
 
-		xData[forPrinting] = MPUData[i];
+	xData[forPrinting] = MPUData[i];
 }
 
-void moveDetection(int i){
-	int gThreshold = 20;
-	int sleep = 300000;
+void moveDetection(uint8_t i){
+	uint8_t gThreshold = 20;
+	uint32_t sleep = 300000;
 	if(MPUData[i].gx > gThreshold){
 		System_printf("L\n");
 		System_flush();
@@ -106,10 +106,10 @@ void moveDetection(int i){
 /*Data collection task*/
 Void sensorFxn(UArg arg0, UArg arg1) {
 	float ax, ay, az, gx, gy, gz;
-/*
+	/*
  	//opening data file to monitor sensor via python script
 	fptr = fopen("data.csv", "w");
-*/
+	 */
 
 	I2C_Handle i2cMPU; // INTERFACE FOR MPU9250 SENSOR
 	I2C_Params i2cMPUParams;
@@ -185,6 +185,37 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 	}
 }
 
+
+void displayFxn(UArg arg0, UArg arg1){
+
+	System_printf("Display init.\n");
+	System_flush();
+
+	Display_Params params;
+	Display_Params_init(&params);
+	params.lineClearMode = DISPLAY_CLEAR_BOTH;
+
+	System_printf("DISPLAY: Opening display.\n");
+	System_flush();
+
+	Display_Handle	displayHandle = Display_open(Display_Type_LCD, &params);
+
+	if (displayHandle == NULL) {
+		System_abort("Display open failed!");
+	}
+
+	Task_sleep(1000 * (1000/Clock_tickPeriod));
+
+	System_printf("DISPLAY: Done initializing display.\n");
+	System_flush();
+
+	while(1){
+		Display_print0(displayHandle, 3, 3, "TEST");
+		Task_sleep(1000000/Clock_tickPeriod);
+	}
+
+}
+
 /* Communication Task */
 /*
  Void commTaskFxn(UArg arg0, UArg arg1) {
@@ -204,8 +235,11 @@ Void sensorFxn(UArg arg0, UArg arg1) {
  */
 Int main(void) {
 
-	Task_Handle task;
-	Task_Params taskParams;
+	Task_Handle dataTask;
+	Task_Params dataTaskParams;
+
+	Task_Handle displayTask;
+	Task_Params displayTaskParams;
 
 	Board_initGeneral();
 	Board_initI2C();
@@ -215,13 +249,26 @@ Int main(void) {
 		System_abort("Pin open failed!");
 	}
 
-	Task_Params_init(&taskParams);
-	taskParams.stackSize = STACKSIZE;
-	taskParams.stack = &taskStack;
-	task = Task_create((Task_FuncPtr) sensorFxn, &taskParams, NULL);
-	if (task == NULL) {
+	Task_Params_init(&displayTaskParams);
+	displayTaskParams.stackSize = STACKSIZE;
+	displayTaskParams.stack = &taskStack;
+	displayTaskParams.priority = 2;
+
+	Task_Params_init(&dataTaskParams);
+	dataTaskParams.stackSize = STACKSIZE;
+	dataTaskParams.stack = &taskStack;
+	dataTaskParams.priority = 2;
+
+	displayTask = Task_create((Task_FuncPtr) displayFxn, &displayTaskParams, NULL);
+	dataTask = Task_create((Task_FuncPtr) sensorFxn, &dataTaskParams, NULL);
+
+	if (dataTask == NULL||displayTask == NULL) {
 		System_abort("Task create failed!");
 	}
+
+	System_printf("Tasks created\n");
+	System_flush();
+
 
 	/* Communication Task */
 	/*
@@ -238,6 +285,9 @@ Int main(void) {
 
 	/* Start BIOS */
 	BIOS_start();
+
+	System_printf("BIOS started\n");
+	System_flush();
 
 	return (0);
 }

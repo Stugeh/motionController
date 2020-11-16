@@ -233,8 +233,6 @@ main.obj: D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx
 main.obj: D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_08/packages/ti/mw/display/DisplayExt.h
 main.obj: D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_08/packages/ti/mw/grlib/grlib.h
 main.obj: D:/ti/ccsv6/tools/compiler/ti-cgt-arm_15.12.1.LTS/include/assert.h
-main.obj: D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_08/packages/ti/drivers/UART.h
-main.obj: D:/ti/ccsv6/tools/compiler/ti-cgt-arm_15.12.1.LTS/include/stddef.h
 main.obj: ../Board.h
 main.obj: ../CC2650STK.h
 main.obj: ../wireless/comm_lib.h
@@ -478,8 +476,6 @@ D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_0
 D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_08/packages/ti/mw/display/DisplayExt.h: 
 D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_08/packages/ti/mw/grlib/grlib.h: 
 D:/ti/ccsv6/tools/compiler/ti-cgt-arm_15.12.1.LTS/include/assert.h: 
-D:/ti/tirtos_cc13xx_cc26xx_2_20_00_06/products/tidrivers_cc13xx_cc26xx_2_20_00_08/packages/ti/drivers/UART.h: 
-D:/ti/ccsv6/tools/compiler/ti-cgt-arm_15.12.1.LTS/include/stddef.h: 
 ../Board.h: 
 ../CC2650STK.h: 
 ../wireless/comm_lib.h: 
