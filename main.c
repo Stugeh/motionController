@@ -27,8 +27,9 @@
 
 /* Task */
 #define STACKSIZE 2048
-Char taskStack[STACKSIZE];
-FILE * fptr;
+Char dataTaskStack[STACKSIZE];
+Char displayTaskStack[STACKSIZE];
+
 // Char commTaskStack[STACKSIZE];
 
 //motion sensor
@@ -39,8 +40,14 @@ static PIN_Config MpuPinConfig[] = {
 
 static const I2CCC26XX_I2CPinCfg i2cMPUCfg = { .pinSDA = Board_I2C0_SDA1, .pinSCL = Board_I2C0_SCL1 };
 
-
-/* Task Functions */
+//Button config
+static PIN_Handle buttonHandle;
+static PIN_State buttonState;
+PIN_Config buttonConfig[] = {
+		Board_BUTTON0  | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
+		Board_BUTTON1  | PIN_INPUT_EN | PIN_PULLUP | PIN_IRQ_NEGEDGE,
+		PIN_TERMINATE
+};
 
 //data struct for MPU data
 struct motionData{
@@ -48,16 +55,33 @@ struct motionData{
 	UInt32 time;
 };
 
-//Stores last 5 seconds of motion data from MPU9250.
+
+/***GLOBAL VARIABLES***/
+
+//Stores last 4 seconds of motion data from MPU9250.
 struct motionData MPUData[40] = {NULL};
-struct motionData xData[100] = {NULL};
+//test array for storing 10 seconds of motion data before printing.
+struct motionData testData[100] = {NULL};
+//test array iterator
+uint8_t forPrinting = 0;
 
+//game state
+enum state{ MENU=1, GAME, HELP };
+enum state currState=MENU;
 
-int forPrinting = 0;
+//current selection when in menu
+uint8_t select=0;
+
+//file pointer for writing test data to file.
+FILE * fptr;
+
+/* Task Functions */
+
 //calculates moving average to clean up data
 void movavg(uint8_t i){
 	//how many datapoints to get the average from
 	uint8_t window=3;
+	//New values for every sensor axis
 	float axTot = 0, ayTot = 0, azTot = 0, gxTot = 0, gyTot = 0, gzTot = 0;
 	uint8_t j;
 	for(j=i; j > i - window; j--){
@@ -75,29 +99,31 @@ void movavg(uint8_t i){
 	MPUData[i].gy = gyTot / window;
 	MPUData[i].gz = gzTot / window;
 
-	xData[forPrinting] = MPUData[i];
+	testData[forPrinting] = MPUData[i];
 }
 
+/*detects moves*/
 void moveDetection(uint8_t i){
 	uint8_t gThreshold = 20;
 	uint32_t sleep = 300000;
+	/*Using gyroscope to determine direction*/
 	if(MPUData[i].gx > gThreshold){
-		System_printf("L\n");
-		System_flush();
-		Task_sleep(sleep / Clock_tickPeriod);
-	}
-	if(MPUData[i].gx < -gThreshold){
-		System_printf("R\n");
-		System_flush();
-		Task_sleep(sleep / Clock_tickPeriod);
-	}
-	if(MPUData[i].gy > gThreshold){
 		System_printf("U\n");
 		System_flush();
 		Task_sleep(sleep / Clock_tickPeriod);
 	}
-	if(MPUData[i].gy < -gThreshold){
+	if(MPUData[i].gx < -gThreshold){
 		System_printf("D\n");
+		System_flush();
+		Task_sleep(sleep / Clock_tickPeriod);
+	}
+	if(MPUData[i].gy > gThreshold){
+		System_printf("R\n");
+		System_flush();
+		Task_sleep(sleep / Clock_tickPeriod);
+	}
+	if(MPUData[i].gy < -gThreshold){
+		System_printf("L\n");
 		System_flush();
 		Task_sleep(sleep / Clock_tickPeriod);
 	}
@@ -143,49 +169,78 @@ Void sensorFxn(UArg arg0, UArg arg1) {
 	int i = 0;
 	UInt32 timestamp;
 	while (1) {
-		struct motionData dataPoint;
-		//Collect data from motion sensor
-		i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
-		if (i2cMPU == NULL) {
-			System_abort("Error Initializing I2CMPU\n");
-		}
-		mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
-		timestamp = Clock_getTicks()/Clock_tickPeriod;
-		I2C_close(i2cMPU);
-
-		//write data to a datapoint and add to array
-		dataPoint.ax = ax;
-		dataPoint.ay = ay;
-		dataPoint.az = az;
-		dataPoint.gx = gx;
-		dataPoint.gy = gy;
-		dataPoint.gz = gz;
-		dataPoint.time = timestamp;
-		MPUData[i] = dataPoint;
-
-		movavg(i);
-		//xData[forPrinting] = MPUData[i];
-		moveDetection(i);
-		i++;
-		forPrinting++;
-		if(forPrinting==100){
-			System_printf("time,ax,ay,az,gx,gy,gz\n");
-			System_flush();
-			int n;
-			for(n=0;n<forPrinting; n++){
-				System_printf("%d,%f,%f,%f,%f,%f,%f\n",xData[n].time, xData[n].ax, xData[n].ay, xData[n].az,xData[n].gx, xData[n].gy, xData[n].gz);
-				System_flush();
+		if(currState==GAME){
+			struct motionData dataPoint;
+			//Collect data from motion sensor
+			i2cMPU = I2C_open(Board_I2C, &i2cMPUParams);
+			if (i2cMPU == NULL) {
+				System_abort("Error Initializing I2CMPU\n");
 			}
+			mpu9250_get_data(&i2cMPU, &ax, &ay, &az, &gx, &gy, &gz);
+			timestamp = Clock_getTicks()/Clock_tickPeriod;
+			I2C_close(i2cMPU);
 
-		}
-		if(i==40){
-			i=0;
+			//write data to a datapoint and add to array
+			dataPoint.ax = ax;
+			dataPoint.ay = ay;
+			dataPoint.az = az;
+			dataPoint.gx = gx;
+			dataPoint.gy = gy;
+			dataPoint.gz = gz;
+			dataPoint.time = timestamp;
+			MPUData[i] = dataPoint;
+
+			movavg(i);
+			//testData[forPrinting] = MPUData[i];
+			moveDetection(i);
+			i++;
+			forPrinting++;
+			if(forPrinting==100){
+				System_printf("time,ax,ay,az,gx,gy,gz\n");
+				System_flush();
+				int n;
+				for(n=0;n<forPrinting; n++){
+					System_printf("%d,%f,%f,%f,%f,%f,%f\n",testData[n].time, testData[n].ax, testData[n].ay, testData[n].az,testData[n].gx, testData[n].gy, testData[n].gz);
+					System_flush();
+				}
+
+			}
+			if(i==40){
+				i=0;
+			}
 		}
 		Task_sleep(100000/Clock_tickPeriod);
 	}
 }
 
+/*Button handler*/
+void buttonFxn(PIN_Handle handle, PIN_Id pinId) {
+	uint8_t numOfSelections = 2;
+	switch (pinId) {
+		case Board_BUTTON0:
+			if(select==0){
+				currState=GAME;
+			}
+			else if(select==1){
+				currState=HELP;
+			}
+			break;
 
+		case Board_BUTTON1:
+			if(select == numOfSelections-1){
+				select=0;
+			}
+			else{
+				select++;
+			}
+			break;
+
+		default:
+			break;
+	}
+}
+
+/*Draws graphics on the integrated display*/
 void displayFxn(UArg arg0, UArg arg1){
 
 	System_printf("Display init.\n");
@@ -209,8 +264,30 @@ void displayFxn(UArg arg0, UArg arg1){
 	System_printf("DISPLAY: Done initializing display.\n");
 	System_flush();
 
+	uint8_t select_mult=7;
 	while(1){
-		Display_print0(displayHandle, 3, 3, "TEST");
+		if(currState == MENU || currState == HELP){
+			tContext *pContext = DisplayExt_getGrlibContext(displayHandle);
+			Display_print0(displayHandle, 0, 9, "SELECT");
+			Display_print0(displayHandle, 1, 2, "MENU");
+			Display_print0(displayHandle, 3, 2, "Start game");
+			Display_print0(displayHandle, 4, 2, "Help");
+			Display_print0(displayHandle, 11, 10, "DOWN");
+			if (pContext) {
+				GrLineDraw(pContext,10,18,74,18);
+				GrLineDraw(pContext,10,32 + select_mult * select, 80, 32 + select_mult * select);
+				GrFlush(pContext);
+			}
+		}
+		if(currState==HELP){
+			Display_print0(displayHandle, 6, 2, "Tilt device");
+			Display_print0(displayHandle, 7, 1, "to move character");
+			Display_print0(displayHandle, 8, 2, "on screen");
+		}
+		if(currState==GAME){
+			/*draw some stuff*/
+		}
+
 		Task_sleep(1000000/Clock_tickPeriod);
 	}
 
@@ -244,21 +321,36 @@ Int main(void) {
 	Board_initGeneral();
 	Board_initI2C();
 
+	//open MPU pin
 	hMpuPin = PIN_open(&MpuPinState, MpuPinConfig);
 	if (hMpuPin == NULL) {
 		System_abort("Pin open failed!");
 	}
 
+	//open button pins
+	buttonHandle = PIN_open(&buttonState, buttonConfig);
+	if(!buttonHandle) {
+		System_abort("Error initializing button pins\n");
+	}
+
+	//set button interrupt handler
+	if (PIN_registerIntCb(buttonHandle, &buttonFxn) != 0) {
+	    System_abort("Error registering button callback function");
+	}
+
+	/*DISPLAY TASK PARAMS*/
 	Task_Params_init(&displayTaskParams);
 	displayTaskParams.stackSize = STACKSIZE;
-	displayTaskParams.stack = &taskStack;
+	displayTaskParams.stack = &displayTaskStack;
 	displayTaskParams.priority = 2;
 
+	/*DATA TASK PARAMS*/
 	Task_Params_init(&dataTaskParams);
 	dataTaskParams.stackSize = STACKSIZE;
-	dataTaskParams.stack = &taskStack;
+	dataTaskParams.stack = dataTaskStack;
 	dataTaskParams.priority = 2;
 
+	/*adding tasks to be executed*/
 	displayTask = Task_create((Task_FuncPtr) displayFxn, &displayTaskParams, NULL);
 	dataTask = Task_create((Task_FuncPtr) sensorFxn, &dataTaskParams, NULL);
 
