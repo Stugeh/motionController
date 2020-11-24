@@ -74,8 +74,10 @@ enum state
 	MENU = 1,
 	GAME,
 	HELP,
+	WIN
 };
 
+// when game is active using state to recognise moves.
 enum move
 {
 	STILL = 1,
@@ -88,8 +90,12 @@ enum move
 enum state currState = MENU;
 enum state prevState = MENU;
 enum move currMove = STILL;
+enum move prevMove = STILL;
 //current selection when in menu
 uint8_t select = 0;
+
+//keeps track of when the last move happened
+UInt32 lastMoveTime = 0;
 
 //file pointer for writing test data to file.
 //FILE *fptr;
@@ -125,38 +131,47 @@ void movavg(uint8_t i)
 /*detects moves*/
 void moveDetection(uint8_t i)
 {
-	uint8_t gThreshold = 20;
-	uint32_t sleep = 150000;
+	uint8_t gThreshold = 50;
+	//uint32_t sleep = 200000;
 	/*Using gyroscope to determine direction*/
-	if (MPUData[i].gx > gThreshold)
+	if ((MPUData[i].time - lastMoveTime) > 1500)
 	{
-		System_printf("U\n");
-		System_flush();
-		currMove = UP;
-		Task_sleep(sleep / Clock_tickPeriod);
+		prevMove = currMove;
+		if (MPUData[i].gx > gThreshold)
+		{
+			System_printf("U\n");
+			System_flush();
+			currMove = UP;
+			lastMoveTime = MPUData[i].time;
+		}
+		else if (MPUData[i].gx < -gThreshold)
+		{
+			System_printf("D\n");
+			System_flush();
+			currMove = DOWN;
+			lastMoveTime = MPUData[i].time;
+		}
+		else if (MPUData[i].gy > gThreshold)
+		{
+			System_printf("R\n");
+			System_flush();
+			currMove = RIGHT;
+			lastMoveTime = MPUData[i].time;
+		}
+		else if (MPUData[i].gy < -gThreshold)
+		{
+			System_printf("L\n");
+			System_flush();
+			currMove = LEFT;
+			lastMoveTime = MPUData[i].time;
+		}
+		//no new moves in 1.5 seconds resets current move back to STILL
+		else if ((MPUData[i].time - lastMoveTime) > 15000)
+		{
+			currMove = STILL;
+		}
 	}
-	if (MPUData[i].gx < -gThreshold)
-	{
-		System_printf("D\n");
-		System_flush();
-		currMove = DOWN;
-		Task_sleep(sleep / Clock_tickPeriod);
-	}
-	if (MPUData[i].gy > gThreshold)
-	{
-		System_printf("R\n");
-		System_flush();
-		currMove = RIGHT;
-		Task_sleep(sleep / Clock_tickPeriod);
-	}
-	if (MPUData[i].gy < -gThreshold)
-	{
-		System_printf("L\n");
-		System_flush();
-		currMove = LEFT;
-		Task_sleep(sleep / Clock_tickPeriod);
-	}
-	//currMove = STILL;
+	//Task_sleep(sleep / Clock_tickPeriod);
 }
 
 /*Data collection task*/
@@ -233,20 +248,18 @@ Void sensorFxn(UArg arg0, UArg arg1)
 				i = 0;
 			}
 
-			/*
-			forPrinting++;
-			if (forPrinting == 100)
-			{
-				System_printf("time,ax,ay,az,gx,gy,gz\n");
-				System_flush();
-				int n;
-				for (n = 0; n < forPrinting; n++)
-				{
-					System_printf("%d,%f,%f,%f,%f,%f,%f\n", testData[n].time, testData[n].ax, testData[n].ay, testData[n].az, testData[n].gx, testData[n].gy, testData[n].gz);
-					System_flush();
-				}
-			}
-			*/
+			// forPrinting++;
+			// if (forPrinting == 100)
+			// {
+			// 	System_printf("time,ax,ay,az,gx,gy,gz\n");
+			// 	System_flush();
+			// 	int n;
+			// 	for (n = 0; n < forPrinting; n++)
+			// 	{
+			// 		System_printf("%d,%f,%f,%f,%f,%f,%f\n", testData[n].time, testData[n].ax, testData[n].ay, testData[n].az, testData[n].gx, testData[n].gy, testData[n].gz);
+			// 		System_flush();
+			// 	}
+			// }
 		}
 		Task_sleep(100000 / Clock_tickPeriod);
 	}
@@ -285,16 +298,18 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 			break;
 		}
 	}
+	else
+	{
+		if (pinId == Board_BUTTON0)
+		{
+			currState = MENU;
+		}
+	}
 }
 
 /*Draws graphics on the integrated display*/
 void displayFxn(UArg arg0, UArg arg1)
 {
-	// uint8_t UP_MAP[8] = {0x18, 0x3c, 0x7e, 0xff, 0xff, 0x3c, 0x3c, 0x3c};
-	// uint8_t DOWN_MAP[8] = {0x3c, 0x3c, 0x3c, 0xff, 0xff, 0x7e, 0x3c, 0x18};
-	// uint8_t LEFT_MAP[8] = {0x18, 0x38, 0x7f, 0xff, 0xff, 0x7f, 0x38, 0x18};
-	// uint8_t RIGHT_MAP[8] = {0x18, 0x1c, 0x7f, 0xff, 0xff, 0x7f, 0x1c, 0x18};
-
 	uint32_t imgPalette[] = {0, 0xFFFFFF};
 
 	const tImage up_img = {
@@ -329,6 +344,14 @@ void displayFxn(UArg arg0, UArg arg1)
 		.pPalette = imgPalette,
 		.pPixel = RIGHT_MAP};
 
+	const tImage still_img = {
+		.BPP = IMAGE_FMT_1BPP_UNCOMP,
+		.NumColors = 2,
+		.XSize = 64,
+		.YSize = 62,
+		.pPalette = imgPalette,
+		.pPixel = STILL_MAP};
+
 	System_printf("Display init.\n");
 	System_flush();
 
@@ -356,14 +379,15 @@ void displayFxn(UArg arg0, UArg arg1)
 	while (1)
 	{
 		tContext *pContext = DisplayExt_getGrlibContext(displayHandle);
-		//when switching from menu or help to game clear the screen.
-		if (currState == GAME && prevState != GAME)
+		//when switching states clear display
+		if (currState != prevState)
 		{
 			Display_clear(displayHandle);
 		}
 		prevState = currState;
 
-		if (currState == MENU)
+		//menu view
+		if (currState == MENU || currState == HELP)
 		{
 			Display_print0(displayHandle, 0, 9, "SELECT");
 			Display_print0(displayHandle, 1, 2, "MENU");
@@ -377,21 +401,37 @@ void displayFxn(UArg arg0, UArg arg1)
 				GrFlush(pContext);
 			}
 		}
+		//help text
 		if (currState == HELP)
 		{
 			Display_print0(displayHandle, 6, 2, "Tilt device");
-			Display_print0(displayHandle, 7, 0, "to move character");
-			Display_print0(displayHandle, 8, 2, "on screen");
+			Display_print0(displayHandle, 7, 2, "on table");
+			Display_print0(displayHandle, 8, 2, "to move");
+			Display_print0(displayHandle, 9, 2, "character");
+			Display_print0(displayHandle, 10, 2, "on screen");
 		}
+
+		//while game state is active draw previous move on the screen.
 		if (currState == GAME)
 		{
+
+			Display_print0(displayHandle, 0, 9, "MENU");
+
 			switch (currMove)
 			{
 			case STILL:
-				Display_print0(displayHandle, 5, 2, "Tilt device");
+				if ((Clock_getTicks() / Clock_tickPeriod - lastMoveTime) > 5000)
+				{
+					if (prevMove != currMove)
+					{
+						Display_clear(displayHandle);
+					}
+					GrImageDraw(pContext, &still_img, 12, 12);
+					GrFlush(pContext);
+				}
 				break;
-
 			case UP:
+
 				Display_clear(displayHandle);
 				GrImageDraw(pContext, &up_img, 12, 12);
 				GrFlush(pContext);
@@ -403,7 +443,7 @@ void displayFxn(UArg arg0, UArg arg1)
 				GrFlush(pContext);
 				break;
 
-			case LEFT:
+			case LEFT:;
 				Display_clear(displayHandle);
 				GrImageDraw(pContext, &left_img, 12, 12);
 				GrFlush(pContext);
