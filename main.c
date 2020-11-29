@@ -132,6 +132,7 @@ void movavg(uint8_t i)
 void moveDetection(uint8_t i)
 {
 	uint8_t gThreshold = 50;
+	char payload[16]="";
 	//uint32_t sleep = 200000;
 	/*Using gyroscope to determine direction*/
 	if ((MPUData[i].time - lastMoveTime) > 1500)
@@ -170,6 +171,7 @@ void moveDetection(uint8_t i)
 		{
 			currMove = STILL;
 		}
+		StartReceive6LoWPAN();
 	}
 	//Task_sleep(sleep / Clock_tickPeriod);
 }
@@ -467,12 +469,16 @@ void displayFxn(UArg arg0, UArg arg1)
 
 Void commTaskFxn(UArg arg0, UArg arg1)
 {
+	char payload[16]; // viestipuskuri
+	uint16_t senderAddr;
+
 	// Radio to receive mode
 	int32_t result = StartReceive6LoWPAN();
 	if (result != true)
 	{
 		System_abort("Wireless receive mode failed");
 	}
+
 	while (1)
 	{
 		// If true, we have a message
@@ -480,7 +486,7 @@ Void commTaskFxn(UArg arg0, UArg arg1)
 		{
 			// Handle the received message..
 		}
-		// Absolutely NO Task_sleep in this task!!
+
 	}
 }
 
@@ -491,6 +497,9 @@ Int main(void)
 
 	Task_Handle displayTask;
 	Task_Params displayTaskParams;
+
+	Task_Handle commTask;
+	Task_Params commTaskParams;
 
 	Board_initGeneral();
 	Board_initI2C();
@@ -540,7 +549,7 @@ Int main(void)
 	System_flush();
 
 	/* Communication Task */
-	/*
+
 	 Init6LoWPAN(); // This function call before use!
 	 Task_Params_init(&commTaskParams);
 	 commTaskParams.stackSize = STACKSIZE;
@@ -550,7 +559,7 @@ Int main(void)
 	 if (commTask == NULL) {
 	 System_abort("Task create failed!");
 	 }
-	 */
+
 
 	/* Start BIOS */
 	BIOS_start();
