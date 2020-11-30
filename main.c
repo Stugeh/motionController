@@ -23,6 +23,7 @@
 #include "Board.h"
 
 #include "wireless/comm_lib.h"
+#include "wireless/address.h"
 #include "sensors/mpu9250.h"
 
 //Image bitmaps for game
@@ -32,6 +33,7 @@
 #define STACKSIZE 2048
 Char dataTaskStack[STACKSIZE];
 Char displayTaskStack[STACKSIZE];
+Char commTaskStack[STACKSIZE];
 
 // Char commTaskStack[STACKSIZE];
 
@@ -74,7 +76,8 @@ enum state
 	MENU = 1,
 	GAME,
 	HELP,
-	WIN
+	WIN,
+	LOST
 };
 
 // when game is active using state to recognise moves.
@@ -132,37 +135,45 @@ void movavg(uint8_t i)
 void moveDetection(uint8_t i)
 {
 	uint8_t gThreshold = 50;
-	char payload[16]="";
+	char payload[16] = "";
 	//uint32_t sleep = 200000;
 	/*Using gyroscope to determine direction*/
-	if ((MPUData[i].time - lastMoveTime) > 1500)
+	if ((MPUData[i].time - lastMoveTime) > 10000)
 	{
 		prevMove = currMove;
 		if (MPUData[i].gx > gThreshold)
 		{
-			System_printf("U\n");
-			System_flush();
+			//System_printf("U\n");
+			//System_flush();
+			sprintf(payload, "event:UP");
+			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = UP;
 			lastMoveTime = MPUData[i].time;
 		}
 		else if (MPUData[i].gx < -gThreshold)
 		{
-			System_printf("D\n");
-			System_flush();
+			//System_printf("D\n");
+			//System_flush();
+			sprintf(payload, "event:DOWN");
+			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = DOWN;
 			lastMoveTime = MPUData[i].time;
 		}
 		else if (MPUData[i].gy > gThreshold)
 		{
-			System_printf("R\n");
-			System_flush();
+			//System_printf("R\n");
+			//System_flush();
+			sprintf(payload, "event:RIGHT");
+			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = RIGHT;
 			lastMoveTime = MPUData[i].time;
 		}
 		else if (MPUData[i].gy < -gThreshold)
 		{
-			System_printf("L\n");
-			System_flush();
+			//System_printf("L\n");
+			//System_flush();
+			sprintf(payload, "event:LEFT");
+			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = LEFT;
 			lastMoveTime = MPUData[i].time;
 		}
@@ -271,7 +282,21 @@ Void sensorFxn(UArg arg0, UArg arg1)
 void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 {
 	uint8_t numOfSelections = 2;
-	if (currState != GAME)
+	if (currState == WIN || currState == LOST)
+	{
+		switch (pinId)
+		{
+		case Board_BUTTON0:
+			currState = GAME;
+			break;
+		case Board_BUTTON1:
+			currState = MENU;
+			break;
+		default:
+			break;
+		}
+	}
+	if (currState == MENU || currState == HELP)
 	{
 		switch (pinId)
 		{
@@ -461,6 +486,18 @@ void displayFxn(UArg arg0, UArg arg1)
 				break;
 			}
 		}
+		if (currState == WIN)
+		{
+			Display_print0(displayHandle, 0, 9, "AGAIN");
+			Display_print0(displayHandle, 6, 2, "WON THE GAME");
+			Display_print0(displayHandle, 11, 9, "MENU");
+		}
+		if (currState == LOST)
+		{
+			Display_print0(displayHandle, 0, 9, "AGAIN");
+			Display_print0(displayHandle, 7, 2, "LOST THE GAME");
+			Display_print0(displayHandle, 11, 9, "MENU");
+		}
 		Task_sleep(1000000 / Clock_tickPeriod);
 	}
 }
@@ -484,9 +521,23 @@ Void commTaskFxn(UArg arg0, UArg arg1)
 		// If true, we have a message
 		if (GetRXFlag() == true)
 		{
-			// Handle the received message..
-		}
+			memset(payload, 0, 16);
+			// Luetaan viesti puskuriin payload
+			Receive6LoWPAN(&senderAddr, payload, 16);
+			// Tulostetaan vastaanotettu viesti konsoli-ikkunaan
+			if (strstr(payload, "131,WIN"))
+			{
+				currState = WIN;
+			}
+			else if (strstr(payload, "131,LOST GAME"))
+			{
+				currState = LOST;
+			}
 
+			System_printf(payload);
+			System_printf("\n");
+			System_flush();
+		}
 	}
 }
 
@@ -550,16 +601,16 @@ Int main(void)
 
 	/* Communication Task */
 
-	 Init6LoWPAN(); // This function call before use!
-	 Task_Params_init(&commTaskParams);
-	 commTaskParams.stackSize = STACKSIZE;
-	 commTaskParams.stack = &commTaskStack;
-	 commTaskParams.priority=1;
-	 commTask = Task_create(commTaskFxn, &commTaskParams, NULL);
-	 if (commTask == NULL) {
-	 System_abort("Task create failed!");
-	 }
-
+	Init6LoWPAN(); // This function call before use!
+	Task_Params_init(&commTaskParams);
+	commTaskParams.stackSize = STACKSIZE;
+	commTaskParams.stack = &commTaskStack;
+	commTaskParams.priority = 1;
+	commTask = Task_create(commTaskFxn, &commTaskParams, NULL);
+	if (commTask == NULL)
+	{
+		System_abort("Task create failed!");
+	}
 
 	/* Start BIOS */
 	BIOS_start();
