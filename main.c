@@ -511,7 +511,7 @@ void displayFxn(UArg arg0, UArg arg1)
 		{
 			sprintf(moves, "%d", moveCount);
 			Display_print0(displayHandle, 0, 9, "MENU");
-			Display_print0(displayHandle, 10, 9, moves;
+			Display_print0(displayHandle, 10, 9, moves);
 			Display_print0(displayHandle, 11, 9, "UNDO");
 
 			switch (currMove)
@@ -599,14 +599,14 @@ Void commTaskFxn(UArg arg0, UArg arg1)
 			{
 				moveCount = 0;
 				historyIter = 0;
-				history = {NULL};
+				memset(history, STILL, sizeof(history));
 				currState = WIN;
 			}
 			else if (strstr(payload, "131,LOST GAME"))
 			{
 				moveCount = 0;
 				historyIter = 0;
-				history = {NULL};
+				memset(history, STILL, sizeof(history));
 				currState = LOST;
 			}
 
