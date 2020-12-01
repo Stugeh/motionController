@@ -94,6 +94,14 @@ enum state currState = MENU;
 enum state prevState = MENU;
 enum move currMove = STILL;
 enum move prevMove = STILL;
+
+uint16_t moveCount = 0;
+
+//stores the last 10 moves
+enum move history[10] = {NULL};
+//iterates the history array
+uint8_t historyIter = 0;
+
 //current selection when in menu
 uint8_t select = 0;
 
@@ -103,7 +111,7 @@ UInt32 lastMoveTime = 0;
 //file pointer for writing test data to file.
 //FILE *fptr;
 
-/* Task Functions */
+/* TASK FUNCTIONS */
 
 //calculates moving average to clean up data
 void movavg(uint8_t i)
@@ -145,6 +153,9 @@ void moveDetection(uint8_t i)
 		{
 			//System_printf("U\n");
 			//System_flush();
+			moveCount++;
+			history[historyIter] = UP;
+			historyIter++;
 			sprintf(payload, "event:UP");
 			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = UP;
@@ -154,6 +165,9 @@ void moveDetection(uint8_t i)
 		{
 			//System_printf("D\n");
 			//System_flush();
+			moveCount++;
+			history[historyIter] = DOWN;
+			historyIter++;
 			sprintf(payload, "event:DOWN");
 			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = DOWN;
@@ -163,6 +177,9 @@ void moveDetection(uint8_t i)
 		{
 			//System_printf("R\n");
 			//System_flush();
+			moveCount++;
+			history[historyIter] = RIGHT;
+			historyIter++;
 			sprintf(payload, "event:RIGHT");
 			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = RIGHT;
@@ -172,15 +189,22 @@ void moveDetection(uint8_t i)
 		{
 			//System_printf("L\n");
 			//System_flush();
+			moveCount++;
+			history[historyIter] = LEFT;
+			historyIter++;
 			sprintf(payload, "event:LEFT");
 			Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 			currMove = LEFT;
 			lastMoveTime = MPUData[i].time;
 		}
-		//no new moves in 1.5 seconds resets current move back to STILL
-		else if ((MPUData[i].time - lastMoveTime) > 15000)
+		//no new moves in 1 second resets current move back to STILL
+		else if ((MPUData[i].time - lastMoveTime) > 10000)
 		{
 			currMove = STILL;
+		}
+		if (historyIter == 10)
+		{
+			historyIter = 0;
 		}
 		StartReceive6LoWPAN();
 	}
@@ -281,7 +305,10 @@ Void sensorFxn(UArg arg0, UArg arg1)
 /*Button handler*/
 void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 {
+
 	uint8_t numOfSelections = 2;
+	char payload[16] = "";
+
 	if (currState == WIN || currState == LOST)
 	{
 		switch (pinId)
@@ -296,7 +323,7 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 			break;
 		}
 	}
-	if (currState == MENU || currState == HELP)
+	else if (currState == MENU || currState == HELP)
 	{
 		switch (pinId)
 		{
@@ -325,11 +352,51 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 			break;
 		}
 	}
-	else
+	else if (currState == GAME)
 	{
+		//return to menu
 		if (pinId == Board_BUTTON0)
 		{
 			currState = MENU;
+		}
+		//UNDO button
+		else if (pinId == Board_BUTTON1)
+		{
+			historyIter--;
+			switch (history[historyIter])
+			{
+			case UP:
+				System_printf("D\n");
+				System_flush();
+				history[historyIter] = STILL;
+				sprintf(payload, "event:DOWN");
+				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
+				break;
+			case DOWN:
+				System_printf("U\n");
+				System_flush();
+				history[historyIter] = STILL;
+				sprintf(payload, "event:UP");
+				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
+				break;
+			case LEFT:
+				System_printf("R\n");
+				System_flush();
+				history[historyIter] = STILL;
+				sprintf(payload, "event:RIGHT");
+				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
+				break;
+			case RIGHT:
+				System_printf("L\n");
+				System_flush();
+				history[historyIter] = STILL;
+				sprintf(payload, "event:LEFT");
+				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
+				break;
+
+			default:
+				break;
+			}
 		}
 	}
 }
@@ -402,6 +469,7 @@ void displayFxn(UArg arg0, UArg arg1)
 	System_flush();
 
 	uint8_t select_mult = 7;
+	char moves[4];
 
 	while (1)
 	{
@@ -441,8 +509,10 @@ void displayFxn(UArg arg0, UArg arg1)
 		//while game state is active draw previous move on the screen.
 		if (currState == GAME)
 		{
-
+			sprintf(moves, "%d", moveCount);
 			Display_print0(displayHandle, 0, 9, "MENU");
+			Display_print0(displayHandle, 10, 9, moves;
+			Display_print0(displayHandle, 11, 9, "UNDO");
 
 			switch (currMove)
 			{
@@ -527,10 +597,16 @@ Void commTaskFxn(UArg arg0, UArg arg1)
 			// Tulostetaan vastaanotettu viesti konsoli-ikkunaan
 			if (strstr(payload, "131,WIN"))
 			{
+				moveCount = 0;
+				historyIter = 0;
+				history = {NULL};
 				currState = WIN;
 			}
 			else if (strstr(payload, "131,LOST GAME"))
 			{
+				moveCount = 0;
+				historyIter = 0;
+				history = {NULL};
 				currState = LOST;
 			}
 
@@ -554,6 +630,7 @@ Int main(void)
 
 	Board_initGeneral();
 	Board_initI2C();
+	Init6LoWPAN();
 
 	//open MPU pin
 	hMpuPin = PIN_open(&MpuPinState, MpuPinConfig);
@@ -587,9 +664,17 @@ Int main(void)
 	dataTaskParams.stack = dataTaskStack;
 	dataTaskParams.priority = 2;
 
+	/*COMMUNICATION TASK PARAMS*/
+
+	Task_Params_init(&commTaskParams);
+	commTaskParams.stackSize = STACKSIZE;
+	commTaskParams.stack = &commTaskStack;
+	commTaskParams.priority = 1;
+
 	/*adding tasks to be executed*/
 	displayTask = Task_create((Task_FuncPtr)displayFxn, &displayTaskParams, NULL);
 	dataTask = Task_create((Task_FuncPtr)sensorFxn, &dataTaskParams, NULL);
+	commTask = Task_create(commTaskFxn, &commTaskParams, NULL);
 
 	if (dataTask == NULL || displayTask == NULL)
 	{
@@ -599,14 +684,6 @@ Int main(void)
 	System_printf("Tasks created\n");
 	System_flush();
 
-	/* Communication Task */
-
-	Init6LoWPAN(); // This function call before use!
-	Task_Params_init(&commTaskParams);
-	commTaskParams.stackSize = STACKSIZE;
-	commTaskParams.stack = &commTaskStack;
-	commTaskParams.priority = 1;
-	commTask = Task_create(commTaskFxn, &commTaskParams, NULL);
 	if (commTask == NULL)
 	{
 		System_abort("Task create failed!");
