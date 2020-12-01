@@ -1,3 +1,4 @@
+/* AUTHOR: Tuukka Veteli 2548 573 */
 
 #include <stdio.h>
 
@@ -151,8 +152,6 @@ void moveDetection(uint8_t i)
 		prevMove = currMove;
 		if (MPUData[i].gx > gThreshold)
 		{
-			//System_printf("U\n");
-			//System_flush();
 			moveCount++;
 			history[historyIter] = UP;
 			historyIter++;
@@ -163,8 +162,6 @@ void moveDetection(uint8_t i)
 		}
 		else if (MPUData[i].gx < -gThreshold)
 		{
-			//System_printf("D\n");
-			//System_flush();
 			moveCount++;
 			history[historyIter] = DOWN;
 			historyIter++;
@@ -175,8 +172,7 @@ void moveDetection(uint8_t i)
 		}
 		else if (MPUData[i].gy > gThreshold)
 		{
-			//System_printf("R\n");
-			//System_flush();
+			;
 			moveCount++;
 			history[historyIter] = RIGHT;
 			historyIter++;
@@ -187,8 +183,6 @@ void moveDetection(uint8_t i)
 		}
 		else if (MPUData[i].gy < -gThreshold)
 		{
-			//System_printf("L\n");
-			//System_flush();
 			moveCount++;
 			history[historyIter] = LEFT;
 			historyIter++;
@@ -245,7 +239,7 @@ Void sensorFxn(UArg arg0, UArg arg1)
 	System_printf("MPU9250: Setup and calibration...\n");
 	System_flush();
 	mpu9250_setup(&i2cMPU);
-	System_printf("MPU9250: Setup and calibration OK\nStarting data collection\n");
+	System_printf("MPU9250: Setup and calibration OK\n");
 	System_flush();
 	I2C_close(i2cMPU);
 
@@ -323,6 +317,7 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 			break;
 		}
 	}
+	//Top button is the select button and bottom button iterates through the menu
 	else if (currState == MENU || currState == HELP)
 	{
 		switch (pinId)
@@ -359,36 +354,29 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 		{
 			currState = MENU;
 		}
-		//UNDO button
+		//UNDO button sends the opposite move of what the latest move is in the history array to the server
 		else if (pinId == Board_BUTTON1)
 		{
 			historyIter--;
+			moveCount--;
 			switch (history[historyIter])
 			{
 			case UP:
-				System_printf("D\n");
-				System_flush();
 				history[historyIter] = STILL;
 				sprintf(payload, "event:DOWN");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 				break;
 			case DOWN:
-				System_printf("U\n");
-				System_flush();
 				history[historyIter] = STILL;
 				sprintf(payload, "event:UP");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 				break;
 			case LEFT:
-				System_printf("R\n");
-				System_flush();
 				history[historyIter] = STILL;
 				sprintf(payload, "event:RIGHT");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 				break;
 			case RIGHT:
-				System_printf("L\n");
-				System_flush();
 				history[historyIter] = STILL;
 				sprintf(payload, "event:LEFT");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
@@ -406,6 +394,7 @@ void displayFxn(UArg arg0, UArg arg1)
 {
 	uint32_t imgPalette[] = {0, 0xFFFFFF};
 
+	/*Initializing the stick figure drawings as graphics*/
 	const tImage up_img = {
 		.BPP = IMAGE_FMT_1BPP_UNCOMP,
 		.NumColors = 2,
@@ -449,13 +438,10 @@ void displayFxn(UArg arg0, UArg arg1)
 	System_printf("Display init.\n");
 	System_flush();
 
+	//Setting params for LCD display and starting it up
 	Display_Params params;
 	Display_Params_init(&params);
 	params.lineClearMode = DISPLAY_CLEAR_BOTH;
-
-	System_printf("DISPLAY: Opening display.\n");
-	System_flush();
-
 	Display_Handle displayHandle = Display_open(Display_Type_LCD, &params);
 
 	if (displayHandle == NULL)
@@ -513,7 +499,7 @@ void displayFxn(UArg arg0, UArg arg1)
 			Display_print0(displayHandle, 0, 9, "MENU");
 			Display_print0(displayHandle, 10, 9, moves);
 			Display_print0(displayHandle, 11, 9, "UNDO");
-
+			//Drawing the corresponding stick figure to which move was made.
 			switch (currMove)
 			{
 			case STILL:
@@ -551,7 +537,6 @@ void displayFxn(UArg arg0, UArg arg1)
 				GrImageDraw(pContext, &right_img, 12, 12);
 				GrFlush(pContext);
 				break;
-
 			default:
 				break;
 			}
@@ -573,7 +558,6 @@ void displayFxn(UArg arg0, UArg arg1)
 }
 
 /* Communication Task */
-
 Void commTaskFxn(UArg arg0, UArg arg1)
 {
 	char payload[16]; // viestipuskuri
@@ -588,13 +572,15 @@ Void commTaskFxn(UArg arg0, UArg arg1)
 
 	while (1)
 	{
-		// If true, we have a message
+		//if message received
 		if (GetRXFlag() == true)
 		{
 			memset(payload, 0, 16);
-			// Luetaan viesti puskuriin payload
 			Receive6LoWPAN(&senderAddr, payload, 16);
-			// Tulostetaan vastaanotettu viesti konsoli-ikkunaan
+			/*
+			if server tells device the game has been won or lost
+			wipe move history and move count and set state to WIN or LOST
+			 */
 			if (strstr(payload, "131,WIN"))
 			{
 				moveCount = 0;
@@ -609,10 +595,6 @@ Void commTaskFxn(UArg arg0, UArg arg1)
 				memset(history, STILL, sizeof(history));
 				currState = LOST;
 			}
-
-			System_printf(payload);
-			System_printf("\n");
-			System_flush();
 		}
 	}
 }
@@ -665,7 +647,6 @@ Int main(void)
 	dataTaskParams.priority = 2;
 
 	/*COMMUNICATION TASK PARAMS*/
-
 	Task_Params_init(&commTaskParams);
 	commTaskParams.stackSize = STACKSIZE;
 	commTaskParams.stack = &commTaskStack;
@@ -676,18 +657,13 @@ Int main(void)
 	dataTask = Task_create((Task_FuncPtr)sensorFxn, &dataTaskParams, NULL);
 	commTask = Task_create(commTaskFxn, &commTaskParams, NULL);
 
-	if (dataTask == NULL || displayTask == NULL)
+	if (dataTask == NULL || displayTask == NULL || commTask == NULL)
 	{
 		System_abort("Task create failed!");
 	}
 
 	System_printf("Tasks created\n");
 	System_flush();
-
-	if (commTask == NULL)
-	{
-		System_abort("Task create failed!");
-	}
 
 	/* Start BIOS */
 	BIOS_start();

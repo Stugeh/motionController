@@ -1,7 +1,13 @@
+
+#
+# Graphing script to draw sensor data from sensortag cc2650 wireless MCU for debugging
+#
+
 from itertools import count
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+
 
 plt.style.use('fivethirtyeight')
 
