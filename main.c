@@ -501,10 +501,6 @@ void displayFxn(UArg arg0, UArg arg1)
 		//while game state is active draw previous move on the screen.
 		if (currState == GAME)
 		{
-			sprintf(moves, "%d", moveCount);
-			Display_print0(displayHandle, 0, 9, "MENU");
-			Display_print0(displayHandle, 10, 9, moves);
-			Display_print0(displayHandle, 11, 9, "UNDO");
 			//Drawing the corresponding stick figure to which move was made.
 			switch (currMove)
 			{
@@ -546,6 +542,10 @@ void displayFxn(UArg arg0, UArg arg1)
 			default:
 				break;
 			}
+			sprintf(moves, "%d", moveCount);
+			Display_print0(displayHandle, 0, 9, "MENU");
+			Display_print0(displayHandle, 10, 9, moves);
+			Display_print0(displayHandle, 11, 9, "UNDO");
 		}
 		if (currState == WIN)
 		{
