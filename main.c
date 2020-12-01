@@ -172,7 +172,6 @@ void moveDetection(uint8_t i)
 		}
 		else if (MPUData[i].gy > gThreshold)
 		{
-			;
 			moveCount++;
 			history[historyIter] = RIGHT;
 			historyIter++;
@@ -357,26 +356,33 @@ void buttonFxn(PIN_Handle handle, PIN_Id pinId)
 		//UNDO button sends the opposite move of what the latest move is in the history array to the server
 		else if (pinId == Board_BUTTON1)
 		{
-			historyIter--;
-			moveCount--;
-			switch (history[historyIter])
+
+			switch (history[historyIter - 1])
 			{
 			case UP:
+				historyIter--;
+				moveCount--;
 				history[historyIter] = STILL;
 				sprintf(payload, "event:DOWN");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 				break;
 			case DOWN:
+				historyIter--;
+				moveCount--;
 				history[historyIter] = STILL;
 				sprintf(payload, "event:UP");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 				break;
 			case LEFT:
+				historyIter--;
+				moveCount--;
 				history[historyIter] = STILL;
 				sprintf(payload, "event:RIGHT");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
 				break;
 			case RIGHT:
+				historyIter--;
+				moveCount--;
 				history[historyIter] = STILL;
 				sprintf(payload, "event:LEFT");
 				Send6LoWPAN(IEEE80154_SERVER_ADDR, payload, strlen(payload));
